@@ -18,14 +18,32 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 
-def poly_intersect(a1, a2, b1, b2):
-    x = (((a1[0]*a2[1] - a1[1]*a2[0])*(b1[0] - b1[0]) -
-         (a1[0] - a2[0])*(b1[0]*b2[1] - b1[1]*b2[0])) /
-         ((a1[0] - a2[0])*(b1[1] - b2[1]) - (a1[1] - a2[1])*(b1[0] - b2[0])))
-    y = (((a1[0]*a2[1] - a1[1]*a2[0])*(b1[1] - b1[1]) -
-         (a1[1] - a2[1])*(b1[0]*b2[1] - b1[1]*b2[0])) /
-         ((a1[0] - a2[0])*(b1[1] - b2[1]) - (a1[1] - a2[1])*(b1[0] - b2[0])))
-    return x, y
+def line_intersect(a1, a2, b1, b2):
+    """
+    http://stackoverflow.com/questions/563198/how-do-you-detect-where-two-line-segments-intersect
+    """
+    points = np.vstack((a1, a2, b1, b2))
+    p = points[0]
+    r = points[1] - points[0]
+    q = points[2]
+    s = points[3] - points[2]
+
+    alpha = np.cross(q - p, s)
+    beta = np.cross(q - p, r)
+    delta = np.cross(r, s)
+
+    if delta == 0:
+        if alpha == 0:
+            raise ArithmeticError('Line segments are collinear')
+        else:
+            raise ArithmeticError('Line segments are parallel')
+    else:
+        t = alpha / delta
+        u = beta / delta
+        if 0 <= t <= 1 and 0 <= u <= 1:
+            return p + t*r
+        else:
+            raise ArithmeticError('Line segments do not intersect')
 
 
 def poly_centroid(points):
@@ -36,13 +54,39 @@ def poly_centroid(points):
         area += c
         x += (p1[0] + p2[0]) * c
         y += (p1[1] + p2[1]) * c
-    return x / (3*area), y / (3*area)
+    return np.array([x / (3*area), y / (3*area)])
 
 
 if __name__ == '__main__':
-    polygon = [[0, 0], [1, 0], [1, 1], [0, 1]]
+    np.set_printoptions(precision=2)
+    # polygon = np.array([[0.0, 0.0], [1, 0], [1, 1], [0, 1]])
+    # polygon = np.array([[0, 0], [1, 0], [1/2, np.sqrt(3)/2]])
+    polygon = np.array([[1, 3], [-1, 4], [-2, 0], [2, 0], [3, 1.0]])
     centroid = poly_centroid(polygon)
     print(centroid)
-    fs = 100
-    angles = np.linspace(0, 2*np.pi, fs)
+    polygon -= centroid
 
+    fs = 1000
+    angles = np.linspace(0, 2*np.pi, fs)
+    points = np.zeros((len(angles), 2))
+
+    shifts = 0
+    segment = polygon[0:2]
+
+    for i, angle in enumerate(angles):
+        ray = np.array([10*np.cos(angle), 10*np.sin(angle)])
+        hit = None
+        while hit is None:
+            try:
+                hit = line_intersect(segment[0], segment[1], [0, 0], ray)
+                points[i] = hit
+            except ArithmeticError:
+                polygon = np.roll(polygon, -1, axis=0)
+                shifts += 1
+                segment = polygon[0:2]
+
+                if shifts > 2*len(polygon):
+                    raise RuntimeError('Polygon not closed')
+
+    plt.plot(points[:, 1])
+    plt.show()
